@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Perfil {
+  multiplicadora
+  coordenador
+  administrador
+}
+
+enum StatusMultiplicador {
+  em_formacao
+  aguardando_validacao
+  formado
+  inativo
+}
+
+enum StatusRoda {
+  ativa
+  concluida
+  pausada
+}
+
+enum TipoRoda {
+  em_grupo
+  individual
+}
+
+enum TipoDocumento {
+  formulario
+  roda_passada
+  outro
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  perfil    Perfil
+  ativo     Boolean  @default(true)
+
+  // Multiplicadora fields
+  telefone  String?
+  estado    String?
+  municipio String?
+  bairro    String?
+
+  // Coordenador / Admin fields
+  regiao    String?
+  estados   String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  multiplicadora  Multiplicador?
+  coordenador     Coordenador?
+
+  @@map("users")
+}
+
+model Multiplicador {
+  id                  String              @id @default(cuid())
+  userId              String              @unique
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status              StatusMultiplicador @default(em_formacao)
+  dataIngresso        DateTime            @default(now())
+  dataConclusao       DateTime?
+  certificadoEmitido  Boolean             @default(false)
+  rodasRealizadas     Int                 @default(0)
+  pessoasImpactadas   Int                 @default(0)
+  municipiosAtendidos Int                 @default(0)
+  coordenadorId       String?
+  coordenador         Coordenador?        @relation(fields: [coordenadorId], references: [id])
+  rodas               Roda[]
+
+  @@map("multiplicadoras")
+}
+
+model Coordenador {
+  id              String          @id @default(cuid())
+  userId          String          @unique
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  regiao          String
+  multiplicadoras Multiplicador[]
+  rodas           Roda[]
+
+  @@map("coordenadores")
+}
+
+model Roda {
+  id               String      @id @default(cuid())
+  nome             String
+  municipio        String
+  estado           String
+  bairro           String
+  local            String
+  tipo             TipoRoda
+  dataInicio       DateTime
+  dataFim          DateTime?
+  status           StatusRoda  @default(ativa)
+  participantes    Int         @default(0)
+  multiplicadoraId String
+  multiplicadora   Multiplicador @relation(fields: [multiplicadoraId], references: [id])
+  coordenadorId    String
+  coordenador      Coordenador  @relation(fields: [coordenadorId], references: [id])
+  documentos       Documento[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@map("rodas")
+}
+
+model ConfiguracaoEstado {
+  estado      String   @id
+  minimoRodas Int      @default(5)
+  updatedAt   DateTime @updatedAt
+
+  @@map("configuracoes_estado")
+}
+
+model Documento {
+  id               String        @id @default(cuid())
+  nome             String
+  tipo             TipoDocumento
+  url              String
+  rodaId           String?
+  roda             Roda?         @relation(fields: [rodaId], references: [id])
+  multiplicadoraId String?
+  createdAt        DateTime      @default(now())
+
+  @@map("documentos")
+}
+
+model SolicitacaoLGPD {
+  id        String   @id @default(cuid())
+  userId    String
+  tipo      String
+  descricao String?
+  status    String   @default("pendente")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("solicitacoes_lgpd")
+}
