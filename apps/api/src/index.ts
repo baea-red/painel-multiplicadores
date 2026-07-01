@@ -16,10 +16,15 @@ import uploadRoutes from './routes/upload.js'
 const app = new Hono().basePath('/api')
 
 // ── Global middleware ──────────────────────────────────────────────────────────
+const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000'
+if (!process.env.FRONTEND_URL && process.env.NODE_ENV === 'production') {
+  throw new Error('FRONTEND_URL não configurada. Defina a variável de ambiente antes de iniciar em produção.')
+}
+
 app.use(
   '*',
   cors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+    origin: FRONTEND_URL,
     allowHeaders: ['Authorization', 'Content-Type'],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,

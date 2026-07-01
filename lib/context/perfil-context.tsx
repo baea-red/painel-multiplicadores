@@ -18,6 +18,11 @@ const PerfilContext = createContext<PerfilContextValue | null>(null)
 const LS_TOKEN = 'gmb_token'
 const LS_MOCK  = 'gmb_usuario_key'
 
+// Credenciais apenas para desenvolvimento local — nunca devem chegar a produção
+if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_API_URL) {
+  throw new Error('NEXT_PUBLIC_API_URL é obrigatória em produção. Mock mode não é permitido.')
+}
+
 const MOCK_CREDS = [
   { email: 'admin@gmb.org',       senha: 'admin123',  key: 'administrador'             },
   { email: 'ana@gmb.org',         senha: 'coord123',  key: 'coordenador'               },

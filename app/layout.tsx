@@ -33,7 +33,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <PerfilProvider>
             <MultiplicadoresProvider>
-              {children}
+              <main>
+                {children}
+              </main>
             </MultiplicadoresProvider>
           </PerfilProvider>
         </Providers>

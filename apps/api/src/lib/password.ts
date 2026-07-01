@@ -9,7 +9,8 @@ export async function compare(plain: string, hashed: string): Promise<boolean> {
 }
 
 export function validate(senha: string): string | null {
-  if (senha.length < 6) return 'Mínimo 6 caracteres'
-  if (!/[A-Za-z]/.test(senha)) return 'Deve conter pelo menos uma letra'
+  if (senha.length < 8) return 'Mínimo 8 caracteres'
+  if (!/[A-Z]/.test(senha)) return 'Deve conter pelo menos uma letra maiúscula'
+  if (!/[0-9]/.test(senha)) return 'Deve conter pelo menos um número'
   return null
 }

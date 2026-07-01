@@ -27,10 +27,10 @@ export default function Home() {
         <div aria-hidden="true" className="absolute bottom-0 left-0 w-96 h-96 rounded-full opacity-8 bg-white" style={{ transform: 'translate(-30%, 30%)' }} />
 
         <div className="relative">
-          <p className="text-white/70 text-sm font-semibold uppercase tracking-widest mb-2">{totalAtivas} MULTIPLICADORAS ATIVAS</p>
+          <p className="text-white text-sm font-semibold uppercase tracking-widest mb-2">{totalAtivas} MULTIPLICADORAS ATIVAS</p>
           <h1 className="text-4xl sm:text-6xl font-heading font-bold text-white mb-2">Mulheres do Brasil</h1>
           <p className="text-white/80 text-xl italic mb-4">Núcleo Ceará</p>
-          <p className="text-white/70 text-base max-w-lg mx-auto mb-10">
+          <p className="text-white/90 text-base max-w-lg mx-auto mb-10">
             Formando multiplicadores para transformar comunidades e promover saúde e cidadania em todo o Brasil.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">

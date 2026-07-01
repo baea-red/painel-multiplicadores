@@ -147,16 +147,16 @@ export default function MapaPage() {
 
           <div className="p-4 border-b border-gray-100 space-y-3">
             <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block mb-1">Estado</label>
-              <select value={estado} onChange={handleEstado}
+              <label htmlFor="mapa-estado" className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block mb-1">Estado</label>
+              <select id="mapa-estado" value={estado} onChange={handleEstado}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white">
                 <option value="">Todos</option>
                 {Object.keys(estadosMunicipios).map(uf => <option key={uf} value={uf}>{uf}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block mb-1">Município</label>
-              <select value={municipio} onChange={e => setMunicipio(e.target.value)} disabled={!estado}
+              <label htmlFor="mapa-municipio" className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 block mb-1">Município</label>
+              <select id="mapa-municipio" value={municipio} onChange={e => setMunicipio(e.target.value)} disabled={!estado}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white disabled:opacity-40 disabled:cursor-not-allowed">
                 <option value="">Todos</option>
                 {municipiosFiltrados.map(m => <option key={m} value={m}>{m}</option>)}

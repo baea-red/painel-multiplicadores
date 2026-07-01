@@ -9,9 +9,11 @@ export interface JWTPayload {
   coordenadorId?: string
 }
 
-const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? 'dev-secret-change-in-production'
-)
+const jwtSecret = process.env.JWT_SECRET
+if (!jwtSecret && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET não configurada. Defina a variável de ambiente antes de iniciar em produção.')
+}
+const secret = new TextEncoder().encode(jwtSecret ?? 'dev-secret-local-only')
 
 const EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '7d'
 

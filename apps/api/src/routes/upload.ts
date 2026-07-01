@@ -11,6 +11,7 @@ upload.use('*', requireAuth)
 const UPLOADS_DIR = join(process.cwd(), 'uploads')
 const MAX_SIZE_MB = 10
 const ALLOWED_EXTS = new Set(['.jpg', '.jpeg', '.png', '.pdf', '.csv'])
+const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'application/pdf', 'text/csv', 'text/plain'])
 
 upload.post('/', async (c) => {
   const body = await c.req.parseBody()
@@ -21,6 +22,7 @@ upload.post('/', async (c) => {
 
   const ext = extname(file.name).toLowerCase()
   if (!ALLOWED_EXTS.has(ext)) return badRequest(c, 'Tipo de arquivo não permitido')
+  if (!ALLOWED_MIMES.has(file.type)) return badRequest(c, 'Tipo MIME não permitido')
 
   const filename = `${randomBytes(16).toString('hex')}${ext}`
 
