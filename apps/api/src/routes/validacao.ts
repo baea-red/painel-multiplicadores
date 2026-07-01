@@ -19,22 +19,38 @@ async function getEstadosCoordenador(coordenadorId: string): Promise<string[]> {
 validacao.get('/', requirePerfil('coordenador', 'administrador'), async (c) => {
   const user = c.get('user')
 
+  const page = Number(c.req.query('page') ?? '1')
+  const limit = Math.min(Number(c.req.query('limit') ?? '20'), 100)
+  const skip = (Math.max(page, 1) - 1) * limit
+
   if (user.perfil === 'coordenador') {
     const estados = await getEstadosCoordenador(user.coordenadorId!)
-    const pendentes = await prisma.multiplicador.findMany({
-      where: { status: 'aguardando_validacao', user: { estado: { in: estados } } },
-      include: { user: { omit: { senhaHash: true } }, rodas: true },
-      orderBy: { dataIngresso: 'asc' },
-    })
-    return c.json({ pendentes })
+    const where = { status: 'aguardando_validacao', user: { estado: { in: estados } } } as const
+    const [pendentes, total] = await Promise.all([
+      prisma.multiplicador.findMany({
+        where,
+        include: { user: { omit: { senhaHash: true } }, rodas: true },
+        orderBy: { dataIngresso: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.multiplicador.count({ where }),
+    ])
+    return c.json({ pendentes, total, page, limit, pages: Math.ceil(total / limit) })
   }
 
-  const pendentes = await prisma.multiplicador.findMany({
-    where: { status: 'aguardando_validacao' },
-    include: { user: { omit: { senhaHash: true } }, rodas: true },
-    orderBy: { dataIngresso: 'asc' },
-  })
-  return c.json({ pendentes, readOnly: true })
+  const where = { status: 'aguardando_validacao' } as const
+  const [pendentes, total] = await Promise.all([
+    prisma.multiplicador.findMany({
+      where,
+      include: { user: { omit: { senhaHash: true } }, rodas: true },
+      orderBy: { dataIngresso: 'asc' },
+      skip,
+      take: limit,
+    }),
+    prisma.multiplicador.count({ where }),
+  ])
+  return c.json({ pendentes, total, page, limit, pages: Math.ceil(total / limit), readOnly: true })
 })
 
 // POST /validacao/:id/aprovar — GAP 4: validar escopo de estado

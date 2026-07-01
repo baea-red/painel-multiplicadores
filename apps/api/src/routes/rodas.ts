@@ -25,8 +25,8 @@ async function getEstadosCoordenador(coordenadorId: string): Promise<string[]> {
 // GET /rodas
 rodas.get('/', async (c) => {
   const user = c.get('user')
-  const page = Number(c.req.query('page') ?? '1')
-  const limit = Math.min(Number(c.req.query('limit') ?? '20'), 100)
+  const page = Math.max(1, Number(c.req.query('page') ?? '1'))
+  const limit = Math.min(Math.max(1, Number(c.req.query('limit') ?? '20')), 100)
   const skip = (page - 1) * limit
 
   if (user.perfil === 'multiplicadora') {
@@ -136,6 +136,15 @@ rodas.put('/:id', requirePerfil('coordenador', 'administrador'), zValidator('jso
 rodas.post('/importar', requirePerfil('coordenador', 'administrador'), zValidator('json', ImportarRodasSchema), async (c) => {
   const { rodas: rodasList } = c.req.valid('json')
 
+  // Valida FKs antes da transação para retornar 400 em vez de 500
+  const multIds = [...new Set(rodasList.map(r => r.multiplicadoraId))]
+  const mults = await prisma.multiplicador.findMany({ where: { id: { in: multIds } }, select: { id: true } })
+  if (mults.length !== multIds.length) {
+    const found = new Set(mults.map(m => m.id))
+    const missing = multIds.filter(id => !found.has(id))
+    return c.json({ error: `Multiplicadoras não encontradas: ${missing.join(', ')}` }, 400)
+  }
+
   const created = await prisma.$transaction(
     rodasList.map(r =>
       prisma.roda.create({
@@ -148,15 +157,18 @@ rodas.post('/importar', requirePerfil('coordenador', 'administrador'), zValidato
     )
   )
 
-  const ids = [...new Set(rodasList.map(r => r.multiplicadoraId))]
-  await Promise.all(ids.map(recalcularKPIs))
+  try {
+    await Promise.all(multIds.map(recalcularKPIs))
+  } catch {
+    // KPIs serão recalculados na próxima operação; rodas já foram criadas com sucesso
+  }
   return c.json({ criadas: created.length, rodas: created }, 201)
 })
 
 type RodaRow = { status: string; participantes: number; municipio: string }
 
 async function recalcularKPIs(multiplicadoraId: string) {
-  const rodasDaMult = (await prisma.roda.findMany({ where: { multiplicadoraId } })) as RodaRow[]
+  const rodasDaMult = (await prisma.roda.findMany({ where: { multiplicadoraId }, take: 10_000 })) as RodaRow[]
   const rodasRealizadas = rodasDaMult.filter(r => r.status === 'concluida').length
   const pessoasImpactadas = rodasDaMult.reduce((s, r) => s + r.participantes, 0)
   const municipiosAtendidos = new Set(rodasDaMult.map(r => r.municipio)).size

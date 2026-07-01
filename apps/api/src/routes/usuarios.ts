@@ -5,7 +5,7 @@ import { CriarUsuarioSchema } from '@gmb/schema'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth, requirePerfil } from '../middleware/auth.js'
 import { hash, validate as validateSenha } from '../lib/password.js'
-import { conflict, badRequest, notFound } from '../lib/errors.js'
+import { conflict, badRequest, notFound, forbidden } from '../lib/errors.js'
 
 const usuarios = new Hono()
 
@@ -17,8 +17,8 @@ const RedefinirSenhaSchema = z.object({
 
 // GET /usuarios — GAP 10: paginação adicionada
 usuarios.get('/', requirePerfil('administrador'), async (c) => {
-  const page = Number(c.req.query('page') ?? '1')
-  const limit = Math.min(Number(c.req.query('limit') ?? '20'), 100)
+  const page = Math.max(1, Number(c.req.query('page') ?? '1'))
+  const limit = Math.min(Math.max(1, Number(c.req.query('limit') ?? '20')), 100)
   const skip = (page - 1) * limit
 
   const [users, total] = await Promise.all([
@@ -89,7 +89,8 @@ usuarios.post('/:id/redefinir-senha', requirePerfil('coordenador', 'administrado
   if (caller.perfil === 'coordenador') {
     if (user.perfil !== 'multiplicadora') return badRequest(c, 'Coordenador só pode redefinir senha de multiplicadoras')
     const coord = await prisma.coordenador.findUnique({ where: { id: caller.coordenadorId! } })
-    const userCoord = await prisma.user.findUnique({ where: { id: coord!.userId } })
+    if (!coord) return forbidden(c)
+    const userCoord = await prisma.user.findUnique({ where: { id: coord.userId } })
     const estados = userCoord?.estados ?? []
     if (!estados.includes(user.estado ?? '')) return badRequest(c, 'Multiplicadora fora do seu escopo de estado')
   }

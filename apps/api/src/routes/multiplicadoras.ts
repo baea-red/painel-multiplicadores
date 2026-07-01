@@ -19,8 +19,8 @@ const AtualizarMultiplicadoraSchema = z.object({
 // GET /multiplicadoras
 multiplicadores.get('/', async (c) => {
   const user = c.get('user')
-  const page = Number(c.req.query('page') ?? '1')
-  const limit = Math.min(Number(c.req.query('limit') ?? '20'), 100)
+  const page = Math.max(1, Number(c.req.query('page') ?? '1'))
+  const limit = Math.min(Math.max(1, Number(c.req.query('limit') ?? '20')), 100)
   const skip = (page - 1) * limit
 
   if (user.perfil === 'multiplicadora') {
@@ -77,6 +77,16 @@ multiplicadores.get('/:id', async (c) => {
     include: { user: { omit: { senhaHash: true } }, rodas: true },
   })
   if (!mult) return notFound(c)
+
+  // Coordenador só vê multiplicadoras do seu escopo de estado
+  if (user.perfil === 'coordenador') {
+    const coord = await prisma.coordenador.findUnique({ where: { id: user.coordenadorId! } })
+    if (!coord) return forbidden(c)
+    const userCoord = await prisma.user.findUnique({ where: { id: coord.userId } })
+    const estados = userCoord?.estados ?? []
+    if (!estados.includes(mult.user.estado ?? '')) return forbidden(c)
+  }
+
   return c.json({ multiplicadora: mult })
 })
 
@@ -95,10 +105,11 @@ multiplicadores.put('/:id', zValidator('json', AtualizarMultiplicadoraSchema), a
 
   // Coordenador só pode atualizar multiplicadoras do seu estado
   if (user.perfil === 'coordenador') {
-    const coord = await prisma.coordenador.findUnique({ where: { id: user.coordenadorId } })
-    const userCoord = await prisma.user.findUnique({ where: { id: coord!.userId } })
+    const coord = await prisma.coordenador.findUnique({ where: { id: user.coordenadorId! } })
+    if (!coord) return forbidden(c)
+    const userCoord = await prisma.user.findUnique({ where: { id: coord.userId } })
     const estados = userCoord?.estados ?? []
-    if (!estados.includes(mult.user.estado)) return forbidden(c)
+    if (!estados.includes(mult.user.estado ?? '')) return forbidden(c)
   }
 
   const data = c.req.valid('json')
