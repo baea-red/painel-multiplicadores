@@ -1,6 +1,6 @@
-# Painel Multiplicadoras — Grupo Mulheres do Brasil (GMB)
+# Painel de Multiplicadores — Grupo Mulheres do Brasil (GMB)
 
-Painel de gestão para o programa de multiplicadoras do GMB. Permite acompanhar o ciclo de formação das multiplicadoras, gerenciar rodas de conversa e emitir certificados.
+Painel de gestão para o programa de multiplicadores do GMB. Permite acompanhar o ciclo de formação, gerenciar rodas de conversa e emitir certificados.
 
 ---
 
