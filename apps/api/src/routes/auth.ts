@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
 import { LoginSchema } from '@gmb/schema'
 import { prisma } from '../lib/prisma.js'
 import { compare, hash, validate as validateSenha } from '../lib/password.js'
@@ -61,9 +62,14 @@ auth.get('/me', requireAuth, async (c) => {
 // POST /auth/logout (stateless — client drops the token)
 auth.post('/logout', requireAuth, (c) => c.json({ ok: true }))
 
-// POST /auth/trocar-senha
-auth.post('/trocar-senha', requireAuth, async (c) => {
-  const { senhaAtual, novaSenha } = await c.req.json()
+const TrocarSenhaSchema = z.object({
+  senhaAtual: z.string().min(1, 'Senha atual obrigatória'),
+  novaSenha: z.string().min(8, 'Mínimo 8 caracteres'),
+})
+
+// POST /auth/trocar-senha — GAP 4: Zod adicionado
+auth.post('/trocar-senha', requireAuth, zValidator('json', TrocarSenhaSchema), async (c) => {
+  const { senhaAtual, novaSenha } = c.req.valid('json')
   const { sub } = c.get('user')
 
   const user = await prisma.user.findUnique({ where: { id: sub } })

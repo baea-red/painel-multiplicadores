@@ -1,4 +1,6 @@
 import { Hono } from 'hono'
+import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth, requirePerfil } from '../middleware/auth.js'
 import { notFound, forbidden, badRequest } from '../lib/errors.js'
@@ -7,10 +9,14 @@ const multiplicadores = new Hono()
 
 multiplicadores.use('*', requireAuth)
 
+const AtualizarMultiplicadoraSchema = z.object({
+  nome: z.string().min(2).optional(),
+  telefone: z.string().optional(),
+  municipio: z.string().optional(),
+  bairro: z.string().optional(),
+})
+
 // GET /multiplicadoras
-// - Admin: all
-// - Coord: filtered by their estados
-// - Mult: only their own
 multiplicadores.get('/', async (c) => {
   const user = c.get('user')
   const page = Number(c.req.query('page') ?? '1')
@@ -45,7 +51,6 @@ multiplicadores.get('/', async (c) => {
     return c.json({ multiplicadoras: list, total, page, limit, pages: Math.ceil(total / limit) })
   }
 
-  // administrador
   const [list, total] = await Promise.all([
     prisma.multiplicador.findMany({
       include: { user: { omit: { senhaHash: true } } },
@@ -73,6 +78,42 @@ multiplicadores.get('/:id', async (c) => {
   })
   if (!mult) return notFound(c)
   return c.json({ multiplicadora: mult })
+})
+
+// PUT /multiplicadoras/:id — GAP 1: endpoint faltando
+multiplicadores.put('/:id', zValidator('json', AtualizarMultiplicadoraSchema), async (c) => {
+  const user = c.get('user')
+  const id = c.req.param('id')
+
+  // Multiplicadora só pode atualizar o próprio perfil; coord/admin podem atualizar qualquer uma
+  if (user.perfil === 'multiplicadora' && user.multiplicadoraId !== id) {
+    return forbidden(c)
+  }
+
+  const mult = await prisma.multiplicador.findUnique({ where: { id }, include: { user: true } })
+  if (!mult) return notFound(c)
+
+  // Coordenador só pode atualizar multiplicadoras do seu estado
+  if (user.perfil === 'coordenador') {
+    const coord = await prisma.coordenador.findUnique({ where: { id: user.coordenadorId } })
+    const userCoord = await prisma.user.findUnique({ where: { id: coord!.userId } })
+    const estados = userCoord?.estados ?? []
+    if (!estados.includes(mult.user.estado)) return forbidden(c)
+  }
+
+  const data = c.req.valid('json')
+  const { nome, telefone, municipio, bairro } = data
+
+  await prisma.user.update({
+    where: { id: mult.userId },
+    data: { nome, telefone, municipio, bairro },
+  })
+
+  const updated = await prisma.multiplicador.findUnique({
+    where: { id },
+    include: { user: { omit: { senhaHash: true } } },
+  })
+  return c.json({ multiplicadora: updated })
 })
 
 // POST /multiplicadoras/:id/solicitar-validacao

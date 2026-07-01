@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
+import { z } from 'zod'
 import { CriarUsuarioSchema } from '@gmb/schema'
 import { prisma } from '../lib/prisma.js'
 import { requireAuth, requirePerfil } from '../middleware/auth.js'
@@ -8,27 +9,38 @@ import { conflict, badRequest, notFound } from '../lib/errors.js'
 
 const usuarios = new Hono()
 
-usuarios.use('*', requireAuth, requirePerfil('administrador'))
+usuarios.use('*', requireAuth)
 
-// GET /usuarios
-usuarios.get('/', async (c) => {
-  const users = await prisma.user.findMany({
-    omit: { senhaHash: true },
-    include: { multiplicadora: true, coordenador: true },
-    orderBy: { nome: 'asc' },
-  })
-  return c.json({ usuarios: users })
+const RedefinirSenhaSchema = z.object({
+  novaSenha: z.string().min(8, 'Mínimo 8 caracteres'),
+})
+
+// GET /usuarios — GAP 10: paginação adicionada
+usuarios.get('/', requirePerfil('administrador'), async (c) => {
+  const page = Number(c.req.query('page') ?? '1')
+  const limit = Math.min(Number(c.req.query('limit') ?? '20'), 100)
+  const skip = (page - 1) * limit
+
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      omit: { senhaHash: true },
+      include: { multiplicadora: true, coordenador: true },
+      orderBy: { nome: 'asc' },
+      skip,
+      take: limit,
+    }),
+    prisma.user.count(),
+  ])
+  return c.json({ usuarios: users, total, page, limit, pages: Math.ceil(total / limit) })
 })
 
 // POST /usuarios
-usuarios.post('/', zValidator('json', CriarUsuarioSchema), async (c) => {
+usuarios.post('/', requirePerfil('administrador'), zValidator('json', CriarUsuarioSchema), async (c) => {
   const data = c.req.valid('json')
 
-  // Email uniqueness
   const exists = await prisma.user.findUnique({ where: { email: data.email.toLowerCase() } })
   if (exists) return conflict(c, 'E-mail já cadastrado no sistema')
 
-  // Password validation
   const senhaErro = validateSenha(data.senhaProvisoria)
   if (senhaErro) return badRequest(c, senhaErro)
 
@@ -46,7 +58,6 @@ usuarios.post('/', zValidator('json', CriarUsuarioSchema), async (c) => {
       bairro: data.bairro,
       regiao: data.regiao,
       estados: data.estados ?? [],
-      // Create related profile record
       ...(data.perfil === 'multiplicadora' && {
         multiplicadora: { create: { dataIngresso: new Date() } },
       }),
@@ -61,26 +72,37 @@ usuarios.post('/', zValidator('json', CriarUsuarioSchema), async (c) => {
   return c.json({ usuario: user }, 201)
 })
 
-// POST /usuarios/:id/redefinir-senha — coord ou admin
-// (contorna o requirePerfil('administrador') do use('*') verificando manualmente)
-usuarios.post('/:id/redefinir-senha', async (c) => {
+// POST /usuarios/:id/redefinir-senha — GAP 3/6: Zod + permissão limpa
+// Admin pode redefinir qualquer senha; coordenador só de multiplicadoras do seu estado
+usuarios.post('/:id/redefinir-senha', requirePerfil('coordenador', 'administrador'), zValidator('json', RedefinirSenhaSchema), async (c) => {
   const caller = c.get('user')
-  if (!['coordenador', 'administrador'].includes(caller.perfil)) {
-    return c.json({ error: 'Sem permissão' }, 403)
-  }
   const id = c.req.param('id')
-  const { novaSenha } = await c.req.json() as { novaSenha: string }
-  if (!novaSenha) return badRequest(c, 'Nova senha obrigatória')
+  const { novaSenha } = c.req.valid('json')
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: { multiplicadora: true },
+  })
+  if (!user) return notFound(c)
+
+  // Coordenador só pode redefinir senha de multiplicadoras do seu estado
+  if (caller.perfil === 'coordenador') {
+    if (user.perfil !== 'multiplicadora') return badRequest(c, 'Coordenador só pode redefinir senha de multiplicadoras')
+    const coord = await prisma.coordenador.findUnique({ where: { id: caller.coordenadorId! } })
+    const userCoord = await prisma.user.findUnique({ where: { id: coord!.userId } })
+    const estados = userCoord?.estados ?? []
+    if (!estados.includes(user.estado ?? '')) return badRequest(c, 'Multiplicadora fora do seu escopo de estado')
+  }
+
   const erro = validateSenha(novaSenha)
   if (erro) return badRequest(c, erro)
-  const user = await prisma.user.findUnique({ where: { id } })
-  if (!user) return notFound(c)
+
   await prisma.user.update({ where: { id }, data: { senhaHash: await hash(novaSenha) } })
   return c.json({ ok: true })
 })
 
 // POST /usuarios/:id/ativar
-usuarios.post('/:id/ativar', async (c) => {
+usuarios.post('/:id/ativar', requirePerfil('administrador'), async (c) => {
   const id = c.req.param('id')
   const user = await prisma.user.findUnique({ where: { id } })
   if (!user) return notFound(c)
@@ -89,7 +111,7 @@ usuarios.post('/:id/ativar', async (c) => {
 })
 
 // POST /usuarios/:id/desativar
-usuarios.post('/:id/desativar', async (c) => {
+usuarios.post('/:id/desativar', requirePerfil('administrador'), async (c) => {
   const id = c.req.param('id')
   const user = await prisma.user.findUnique({ where: { id } })
   if (!user) return notFound(c)

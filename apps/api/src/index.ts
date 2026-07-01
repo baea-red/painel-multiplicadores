@@ -15,6 +15,31 @@ import uploadRoutes from './routes/upload.js'
 
 const app = new Hono().basePath('/api')
 
+// ── Rate limiter simples em memória (GAP 8) ────────────────────────────────────
+const loginAttempts = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_MAX = 10
+const RATE_LIMIT_WINDOW_MS = 60_000
+
+function rateLimitLogin(ip: string): boolean {
+  const now = Date.now()
+  const entry = loginAttempts.get(ip)
+  if (!entry || now > entry.resetAt) {
+    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return true
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false
+  entry.count++
+  return true
+}
+
+// Limpa entradas expiradas a cada 5 min
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, val] of loginAttempts.entries()) {
+    if (now > val.resetAt) loginAttempts.delete(key)
+  }
+}, 300_000)
+
 // ── Global middleware ──────────────────────────────────────────────────────────
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000'
 if (!process.env.FRONTEND_URL && process.env.NODE_ENV === 'production') {
@@ -38,6 +63,15 @@ app.use('/uploads/*', serveStatic({ root: './' }))
 app.get('/health', (c) => c.json({ status: 'ok', ts: new Date().toISOString() }))
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
+// Rate limit na rota de login
+app.use('/auth/login', async (c, next) => {
+  const ip = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown'
+  if (!rateLimitLogin(ip)) {
+    return c.json({ error: 'Muitas tentativas. Aguarde 1 minuto.' }, 429)
+  }
+  await next()
+})
+
 app.route('/auth', authRoutes)
 app.route('/multiplicadoras', multiplicadorasRoutes)
 app.route('/rodas', rodasRoutes)

@@ -50,6 +50,27 @@ async function main() {
     include: { coordenador: true },
   })
 
+  const coordBahia = await prisma.user.upsert({
+    where: { email: 'marcia@gmb.org' },
+    update: {},
+    create: {
+      nome: 'Márcia Oliveira',
+      email: 'marcia@gmb.org',
+      senhaHash: await bcrypt.hash('coord123', 12),
+      perfil: 'coordenador',
+      estados: ['BA'],
+      regiao: 'Nordeste',
+      coordenador: { create: { regiao: 'Nordeste' } },
+    },
+    include: { coordenador: true },
+  })
+
+  await prisma.configuracaoEstado.upsert({
+    where: { estado: 'BA' },
+    update: {},
+    create: { estado: 'BA', minimoRodas: 5 },
+  })
+
   // Multiplicadores
   const mult1 = await prisma.user.upsert({
     where: { email: 'mult1@example.com' },
@@ -98,7 +119,7 @@ async function main() {
           rodasRealizadas: 5,
           pessoasImpactadas: 197,
           municipiosAtendidos: 4,
-          coordenadorId: coordAna.coordenador?.id,
+          coordenadorId: coordBahia.coordenador?.id,
         },
       },
     },
@@ -145,11 +166,13 @@ async function main() {
 
   console.log('✅ Seed concluído!')
   console.log('Credenciais de acesso:')
-  console.log('  Admin:      admin@gmb.org / admin123')
-  console.log('  Coord Ana:  ana@gmb.org / coord123')
-  console.log('  Mult 1:     mult1@example.com / mult123')
-  console.log('  Mult 3:     mult3@example.com / mult123 (aguardando validação)')
-  console.log('  Mult 4:     mult4@example.com / mult123 (em formação)')
+  console.log('  Admin:        admin@gmb.org / admin123')
+  console.log('  Coord CE:     ana@gmb.org / coord123')
+  console.log('  Coord SP:     cristina@gmb.org / coord123')
+  console.log('  Coord BA:     marcia@gmb.org / coord123')
+  console.log('  Mult 1 (CE):  mult1@example.com / mult123 (formada)')
+  console.log('  Mult 3 (BA):  mult3@example.com / mult123 (aguardando validação)')
+  console.log('  Mult 4 (CE):  mult4@example.com / mult123 (em formação)')
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect())
