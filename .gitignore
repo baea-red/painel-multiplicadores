@@ -44,6 +44,11 @@ next-env.d.ts
 # JetBrains IDE
 .idea/
 
+# Claude Code instructions
+CLAUDE.md
+AGENTS.md
+.claude/
+
 # compiled
 *.class
 *.py[cod]
